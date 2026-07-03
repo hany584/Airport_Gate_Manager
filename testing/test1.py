@@ -1,5 +1,5 @@
 import unittest
-from part1_toolbox.task1_models import FlightStatus, Flight, Gate, Passenger
+from toolbox.models import FlightStatus, Flight, Gate, Passenger
 
 class TestTask1Models(unittest.TestCase):
     def setUp(self):

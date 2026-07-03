@@ -1,6 +1,6 @@
-from part1_toolbox.task4_data_gen import generate_all_datasets, load_gates, load_flights, load_passengers, init_gate_graph
-from part1_toolbox.task2_queue import LinkedListQueue, PriorityQueue
-from part1_toolbox.task1_models import Passenger
+from toolbox.data_gen import generate_all_datasets, load_gates, load_flights, load_passengers, init_gate_graph
+from toolbox.queue import LinkedListQueue, PriorityQueue
+from toolbox.models import Passenger
 
 def demo_queue_function():
     """演示两种队列使用"""

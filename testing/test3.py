@@ -1,6 +1,6 @@
 import unittest
-from part1_toolbox.task1_models import Gate
-from part1_toolbox.task3_graph import DirectedWeightedGraph
+from toolbox.models import Gate
+from toolbox.graph import DirectedWeightedGraph
 
 class TestTask3Graph(unittest.TestCase):
     def setUp(self):

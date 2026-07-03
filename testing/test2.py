@@ -1,6 +1,6 @@
 import unittest
-from part1_toolbox.task1_models import Passenger
-from part1_toolbox.task2_queue import LinkedListQueue, PriorityQueue
+from toolbox.models import Passenger
+from toolbox.queue import LinkedListQueue, PriorityQueue
 
 class TestTask2Queue(unittest.TestCase):
     def setUp(self):

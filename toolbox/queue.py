@@ -1,13 +1,13 @@
 from typing import Optional
-from part1_toolbox.task1_models import Passenger
+from toolbox.models import Passenger
 
-# 单链表节点（手写，不使用collections.deque）
+# 单链表节点
 class ListNode:
     def __init__(self, value: Passenger):
         self.value = value
         self.next: Optional[ListNode] = None
 
-# FIFO标准队列：链表实现，优于列表list(列表pop(0) O(n)，链表dequeue O(1))
+# FIFO标准链表队列
 class LinkedListQueue:
     def __init__(self):
         self.head: Optional[ListNode] = None
@@ -30,7 +30,6 @@ class LinkedListQueue:
         pop_node = self.head
         self.head = self.head.next
         self._size -= 1
-        # 队列为空时尾指针置空
         if self.head is None:
             self.tail = None
         return pop_node.value
@@ -49,12 +48,11 @@ class LinkedListQueue:
             cur = cur.next
         print(f"[FIFO队列] 元素：{' -> '.join(res) if res else '空队列'}")
 
-# 手写最大堆优先队列（不使用heapq库，完全自实现堆结构）
+# 最大堆优先队列
 class PriorityQueue:
     def __init__(self):
         self._heap: list[tuple[int, Passenger]] = []
 
-    # 堆索引工具函数
     def _parent_idx(self, idx: int) -> int:
         return (idx - 1) // 2
 
@@ -67,14 +65,12 @@ class PriorityQueue:
     def _swap(self, i: int, j: int) -> None:
         self._heap[i], self._heap[j] = self._heap[j], self._heap[i]
 
-    # 上浮堆化
     def _heapify_up(self, idx: int) -> None:
         parent = self._parent_idx(idx)
         if idx > 0 and self._heap[idx][0] > self._heap[parent][0]:
             self._swap(idx, parent)
             self._heapify_up(parent)
 
-    # 下沉堆化
     def _heapify_down(self, idx: int) -> None:
         largest = idx
         left = self._left_idx(idx)
@@ -101,14 +97,12 @@ class PriorityQueue:
         return top_person
 
     def peek(self) -> Optional[Passenger]:
-        if len(self._heap) == 0:
-            return None
-        return self._heap[0][1]
+        return self._heap[0][1] if self._heap else None
 
     def size(self) -> int:
         return len(self._heap)
 
     def display(self) -> None:
         sorted_list = sorted(self._heap, key=lambda x: x[0], reverse=True)
-        show_text = [f"{p[1]} (优先级分数:{p[0]})" for p in sorted_list]
-        print(f"[优先队列] 排序序列：{' -> '.join(show_text) if show_text else '空队列'}")
+        show_text = [f"{p[1]} (分数:{p[0]})" for p in sorted_list]
+        print(f"[优先队列] 排序：{' -> '.join(show_text) if show_text else '空队列'}")

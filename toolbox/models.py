@@ -29,8 +29,8 @@ class Gate:
         self.terminal = terminal
         self.capacity = capacity
         self.is_international = is_international
-        self.regular_queue = None   # 绑定FIFO普通队列
-        self.priority_queue = None  # 绑定优先登机队列
+        self.regular_queue = None    # 绑定FIFO普通队列
+        self.priority_queue = None   # 绑定优先登机队列
 
     def __repr__(self):
         return f"<Gate {self.gate_id} | Terminal:{self.terminal}>"
@@ -39,7 +39,7 @@ class Passenger:
     def __init__(self, passenger_id: str, name: str, boarding_group: int,
                  has_special_needs: bool, connecting_flight_id: str = None):
         if not 1 <= boarding_group <= 5:
-            raise ValueError("登机组必须为1~5之间整数")
+            raise ValueError("boarding_group必须为1~5整数")
         self.passenger_id = passenger_id
         self.name = name
         self.boarding_group = boarding_group
@@ -50,12 +50,9 @@ class Passenger:
         return f"<Passenger {self.passenger_id} | Name:{self.name}>"
 
     def get_priority_score(self) -> int:
-        """优先级评分公式：分数越高，优先登机
-        基础分10
-        特殊需求乘客 +50
-        登机组1号乘客 +40
-        转机乘客 +30
-        合理性：特殊人群优先级最高，其次优先前排登机组，转机旅客避免误机，普通旅客最低
+        """优先级打分：分数越高优先登机
+        基础10分
+        特殊旅客+50，1组旅客+40，转机旅客+30
         """
         base = 10
         if self.has_special_needs:
