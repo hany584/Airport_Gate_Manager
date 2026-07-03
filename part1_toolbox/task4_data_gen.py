@@ -3,7 +3,7 @@ import random
 import os
 from faker import Faker
 from typing import Dict, List
-from part1_toolbox.task1_models import Flight, Gate, Passenger, FlightStatus
+from .task1_models import Flight, Gate, Passenger, FlightStatus
 from part1_toolbox.task2_queue import LinkedListQueue, PriorityQueue
 from part1_toolbox.task3_graph import DirectedWeightedGraph
 

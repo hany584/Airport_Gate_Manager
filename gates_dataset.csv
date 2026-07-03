@@ -1,0 +1,13 @@
+gate_id,terminal,capacity,is_international
+G01,T1,106,False
+G02,T1,143,False
+G03,T1,151,False
+G04,T1,154,False
+G05,T2,206,True
+G06,T1,180,False
+G07,T2,190,True
+G08,T1,104,False
+G09,T1,110,False
+G10,T2,201,True
+G11,T1,135,False
+G12,T2,139,True
