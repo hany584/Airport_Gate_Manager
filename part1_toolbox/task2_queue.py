@@ -1,7 +1,7 @@
 from typing import Optional
 from part1_toolbox.task1_models import Passenger
 
-# 单链表节点
+# 单链表节点（手写，不使用collections.deque）
 class ListNode:
     def __init__(self, value: Passenger):
         self.value = value
@@ -49,7 +49,7 @@ class LinkedListQueue:
             cur = cur.next
         print(f"[FIFO队列] 元素：{' -> '.join(res) if res else '空队列'}")
 
-# 最大堆优先队列
+# 手写最大堆优先队列（不使用heapq库，完全自实现堆结构）
 class PriorityQueue:
     def __init__(self):
         self._heap: list[tuple[int, Passenger]] = []
