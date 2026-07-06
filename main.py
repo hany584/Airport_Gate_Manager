@@ -2,19 +2,18 @@ from toolbox.data_gen import generate_all_datasets, load_gates, load_flights, lo
 from toolbox.queue import LinkedListQueue, PriorityQueue
 from toolbox.models import Passenger
 
+
 def demo_queue_function():
     """演示两种队列使用"""
     print("\n===== 队列功能演示 =====")
     p1 = Passenger("P0001", "Olivia Taylor", 1, True, "CA9999")
     p2 = Passenger("P0002", "Noah Wilson", 4, False, None)
     p3 = Passenger("P0003", "Ava Davis", 2, False, "CA8888")
-
     fifo = LinkedListQueue()
     fifo.enqueue(p1)
     fifo.enqueue(p2)
     fifo.enqueue(p3)
     fifo.display()
-
     pri = PriorityQueue()
     pri.enqueue(p1)
     pri.enqueue(p2)
@@ -38,6 +37,7 @@ def main():
     gate_graph.display_graph()
     # 4. 演示队列
     demo_queue_function()
+
 
 if __name__ == "__main__":
     main()
