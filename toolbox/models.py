@@ -1,4 +1,7 @@
 from enum import Enum
+from typing import Optional
+# 此处导入之前改造完成的链表队列类（LinkedListQueue、ListNode、PriorityQueue）
+from toolbox.queue import ListNode, LinkedListQueue, PriorityQueue
 
 class FlightStatus(Enum):
     ON_TIME = "ON_TIME"
@@ -16,25 +19,27 @@ class Flight:
         self.origin_or_destination = origin_or_destination
         self.scheduled_time = scheduled_time
         self.status = status
-        # 改进1：不再仅存储gate_id字符串，存储完整Gate对象
-        self.gate: Gate | None = None
-        self._gate_id = gate_id  # 保留原id字段用于匹配Gate实例
+        self.gate: Optional["Gate"] = None
+        self._gate_id = gate_id
         self.passenger_count = passenger_count
         self.delay_minutes = delay_minutes
-        # 改进2：绑定当前航班所有乘客列表，建立乘客-航班双向关联
-        self.passengers: list[Passenger] = []
+        self.passengers: list["Passenger"] = []
 
-    # 改进3：提供绑定Gate完整对象的方法
     def bind_gate(self, gate_obj: "Gate") -> None:
         if gate_obj.gate_id == self._gate_id:
             self.gate = gate_obj
+            # NEW 改动：绑定Gate时，航班所有乘客自动加入登机口登机队列
+            for pax in self.passengers:
+                gate_obj.boarding_queue.enqueue(pax)
         else:
             raise ValueError(f"Gate ID不匹配：航班{self.flight_id}预期{self._gate_id}，传入{gate_obj.gate_id}")
 
-    # 改进4：绑定乘客到当前航班，实现乘客与航班关联
     def add_passenger(self, passenger: "Passenger") -> None:
         passenger.bind_flight(self)
         self.passengers.append(passenger)
+        # NEW 改动：新增乘客时，如果航班已绑定登机口，直接加入Gate的同步队列
+        if self.gate is not None and self.gate.boarding_queue is not None:
+            self.gate.boarding_queue.enqueue(passenger)
 
     def __repr__(self):
         gate_info = self.gate.gate_id if self.gate else f"未绑定Gate({self._gate_id})"
@@ -46,30 +51,33 @@ class Gate:
         self.terminal = terminal
         self.capacity = capacity
         self.is_international = is_international
-        # 改进5：删除分开的两个队列属性，统一使用同步FIFO队列（内置自动同步优先堆）
-        self.boarding_queue = None
-        # 改进6：存储停靠在本登机口的航班，打通图与航班数据
-        self.docked_flight: Flight | None = None
-        # 改进7：存储相邻登机口，构建登机口连通图结构
+        # MODIFIED 改动：初始化同步FIFO队列（内置自动维护的优先堆）
+        self.boarding_queue: Optional[LinkedListQueue] = LinkedListQueue()
+        self.docked_flight: Optional[Flight] = None
         self.adjacent_gates: list["Gate"] = []
 
-    # 改进8：登机口之间建立连通关系（图结构）
     def connect_adjacent_gate(self, other_gate: "Gate") -> None:
         if other_gate not in self.adjacent_gates:
             self.adjacent_gates.append(other_gate)
             other_gate.connect_adjacent_gate(self)
 
-    # 改进9：绑定停靠在该登机口的航班
     def dock_flight(self, flight_obj: Flight) -> None:
         if flight_obj._gate_id == self.gate_id:
             self.docked_flight = flight_obj
+            flight_obj.bind_gate(self) # NEW 改动：双向绑定Flight与Gate
         else:
             raise ValueError(f"航班{flight_obj.flight_id}Gate ID与登机口{self.gate_id}不匹配")
+
+    # NEW 新增辅助方法：一键打印当前登机口FIFO与优先队列
+    def show_all_queues(self) -> None:
+        print(f"\n==== Gate {self.gate_id} 登机队列 ====")
+        self.boarding_queue.display_all()
 
     def __repr__(self):
         flight_info = self.docked_flight.flight_id if self.docked_flight else "无停靠航班"
         adj_ids = [g.gate_id for g in self.adjacent_gates]
-        return f"<Gate {self.gate_id} | Terminal:{self.terminal} | DockedFlight:{flight_info} | AdjacentGates:{adj_ids}>"
+        queue_size = self.boarding_queue.size() if self.boarding_queue else 0
+        return f"<Gate {self.gate_id} | Terminal:{self.terminal} | DockedFlight:{flight_info} | QueueSize:{queue_size} | AdjacentGates:{adj_ids}>"
 
 class Passenger:
     def __init__(self, passenger_id: str, name: str, boarding_group: int,
@@ -81,10 +89,8 @@ class Passenger:
         self.boarding_group = boarding_group
         self.has_special_needs = has_special_needs
         self.connecting_flight_id = connecting_flight_id
-        # 改进10：新增属性，存储乘客所属航班，实现双向关联
-        self.flight: Flight | None = None
+        self.flight: Optional[Flight] = None
 
-    # 改进11：绑定乘客所属航班
     def bind_flight(self, flight_obj: Flight) -> None:
         self.flight = flight_obj
 

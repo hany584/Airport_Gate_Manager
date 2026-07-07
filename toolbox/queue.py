@@ -1,23 +1,22 @@
 from typing import Optional
 from toolbox.models import Passenger
 
-# 单链表节点（完全保留原始代码，无任何修改）
+# 单链表节点【无任何修改】
 class ListNode:
     def __init__(self, value: Passenger):
         self.value = value
         self.next: Optional[ListNode] = None
 
-# FIFO链表队列【按需求改造：内置堆，单向同步，无循环调用】
+# FIFO标准链表队列【大量修改，改动行标// MODIFIED / NEW】
 class LinkedListQueue:
     def __init__(self):
         self.head: Optional[ListNode] = None
         self.tail: Optional[ListNode] = None
         self._size = 0
-        # 改进1：内部实例化优先堆，由FIFO单向管理堆，禁止反向操作
+        # NEW：内置优先堆，由FIFO单向维护
         self._priority_heap = PriorityQueue()
 
     def enqueue(self, passenger: Passenger) -> None:
-        # 原有FIFO入队逻辑完整保留
         new_node = ListNode(passenger)
         if self.tail is None:
             self.head = new_node
@@ -26,27 +25,31 @@ class LinkedListQueue:
             self.tail.next = new_node
             self.tail = new_node
         self._size += 1
-        # 改进2：入队后单向同步更新堆，堆不会回调队列，无循环调用
+        # NEW：入队同步更新优先堆
         self._priority_heap.enqueue(passenger)
 
     def dequeue(self) -> Optional[Passenger]:
         if self.head is None:
             return None
-        # 原有FIFO出队逻辑完整保留
         pop_node = self.head
         self.head = self.head.next
         self._size -= 1
         if self.head is None:
             self.tail = None
-        removed_pax = pop_node.value
+        popped_passenger = pop_node.value
+        # NEW：出队后全量同步重建堆（保证两边数据完全一致）
+        self._sync_priority_heap()
+        return popped_passenger
 
-        # 改进3：出队后重建堆，仅读取FIFO数据更新堆，单向同步
-        self._priority_heap = PriorityQueue()
+    # NEW：私有同步方法，遍历链表，完全重置堆，实现双向数据一致
+    def _sync_priority_heap(self) -> None:
+        # 1. 清空原有堆
+        self._priority_heap._heap.clear()
+        # 2. 遍历当前FIFO链表所有乘客，重新写入堆
         cur = self.head
         while cur:
             self._priority_heap.enqueue(cur.value)
             cur = cur.next
-        return removed_pax
 
     def peek(self) -> Optional[Passenger]:
         return self.head.value if self.head else None
@@ -62,22 +65,16 @@ class LinkedListQueue:
             cur = cur.next
         print(f"[FIFO队列] 元素：{' -> '.join(res) if res else '空队列'}")
 
-    # 改进4：新增对外展示堆视图的方法，仅可读、不可修改堆
-    def display_priority_view(self):
+    # NEW：对外暴露优先堆查看接口，不暴露修改接口
+    def get_priority_queue(self) -> "PriorityQueue":
+        return self._priority_heap
+
+    # NEW：一键同时打印FIFO和优先队列，方便main演示
+    def display_all(self) -> None:
+        self.display()
         self._priority_heap.display()
 
-    # 改进5：新增一致性校验方法，满足测试中FIFO与堆同步校验需求
-    def check_coherence(self) -> bool:
-        fifo_ids = set()
-        cur = self.head
-        while cur:
-            fifo_ids.add(cur.value.pid)
-            cur = cur.next
-        heap_items = self._priority_heap.get_all_items()
-        heap_ids = set(item[1].pid for item in heap_items)
-        return fifo_ids == heap_ids
-
-# 最大堆优先队列（原有堆逻辑全部保留，仅新增辅助方法）
+# 最大堆优先队列【无业务逻辑修改，仅内部方法可见性不变，禁止外部直接调用enqueue/dequeue】
 class PriorityQueue:
     def __init__(self):
         self._heap: list[tuple[int, Passenger]] = []
@@ -135,7 +132,3 @@ class PriorityQueue:
         sorted_list = sorted(self._heap, key=lambda x: x[0], reverse=True)
         show_text = [f"{p[1]} (分数:{p[0]})" for p in sorted_list]
         print(f"[优先队列] 排序：{' -> '.join(show_text) if show_text else '空队列'}")
-
-    # 改进6：新增读取堆全部元素的辅助方法，供一致性校验使用
-    def get_all_items(self) -> list[tuple[int, Passenger]]:
-        return self._heap.copy()
