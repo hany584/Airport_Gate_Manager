@@ -69,3 +69,4 @@ if __name__ == "__main__":
     for gid, busy in res["gate_busy_min"].items():
         ratio = round(busy / res["sim_total_min"], 3)
         print(f"{gid} 利用率：{ratio}")
+        
