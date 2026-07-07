@@ -14,7 +14,7 @@ from typing import Dict, List
 
 # 全局标准绝对导入
 from toolbox.models import Flight, Gate, Passenger, FlightStatus
-from toolbox.queue import LinkedListQueue, PriorityQueue
+from toolbox.queue import LinkedListQueue  # 改进：只导入同步FIFO，不再单独导入独立PriorityQueue
 from toolbox.graph import DirectedWeightedGraph
 
 # 英文虚拟数据生成器
@@ -89,7 +89,7 @@ def generate_all_datasets():
     print("2. gates_dataset.csv")
     print("3. passengers_dataset.csv")
 
-# 加载廊桥CSV，实例化Gate并绑定FIFO/优先双队列
+# 加载廊桥CSV，实例化Gate并绑定**同步一体化FIFO队列**（改进1）
 def load_gates() -> Dict[str, Gate]:
     gate_dict = {}
     with open(GATE_CSV, "r", encoding="utf-8") as f:
@@ -101,8 +101,8 @@ def load_gates() -> Dict[str, Gate]:
                 capacity=int(row["capacity"]),
                 is_international=eval(row["is_international"])
             )
-            g.regular_queue = LinkedListQueue()
-            g.priority_queue = PriorityQueue()
+            # 改进1：移除独立双队列regular_queue / priority_queue，统一使用内置同步堆的LinkedListQueue
+            g.boarding_queue = LinkedListQueue()
             gate_dict[g.gate_id] = g
     return gate_dict
 
@@ -155,3 +155,67 @@ def init_gate_graph() -> DirectedWeightedGraph:
             walk_time = random.randint(3, 12)
             graph.add_path(start_gate, end_gate, walk_time)
     return graph
+
+# -------------------------- 新增核心联动函数（匹配任务2：打通图、Gate、Flight、乘客一体化系统） --------------------------
+def link_full_system(gate_map: Dict[str, Gate], flight_map: Dict[str, Flight], passenger_list: List[Passenger]):
+    """
+    改进2：完整联动整套业务系统，满足任务2要求：
+    1. Flight绑定真实Gate对象（不只用gate_id）
+    2. Gate绑定停靠的Flight
+    3. 所有Passenger绑定对应Flight并加入登机同步队列
+    """
+    # 1. 航班绑定Gate完整对象
+    for flight in flight_map.values():
+        target_gate = gate_map.get(flight._gate_id)
+        if target_gate:
+            flight.bind_gate(target_gate)
+            target_gate.dock_flight(flight)
+
+    # 2. 乘客随机分配至航班，双向绑定航班并加入FIFO队列（堆自动同步）
+    flight_id_list = list(flight_map.keys())
+    for pax in passenger_list:
+        target_flight_id = random.choice(flight_id_list)
+        target_flight = flight_map[target_flight_id]
+        target_flight.add_passenger(pax)
+
+# -------------------------- 新增演示入口（匹配任务3：main使用自动生成数据集展示双队列） --------------------------
+def demo_system():
+    """完整系统演示，使用自动生成CSV数据集，打印FIFO与同步优先列表"""
+    # 1. 生成批量数据集（替代手写3个乘客）
+    generate_all_datasets()
+
+    # 2. 加载所有模型
+    gate_dict = load_gates()
+    flight_dict = load_flights()
+    pax_list = load_passengers()
+    gate_graph = init_gate_graph()
+
+    # 3. 联动Gate-Flight-Passenger，整合为一套系统
+    link_full_system(gate_dict, flight_dict, pax_list)
+
+    # 4. 打印登机口拓扑图
+    print("\n======== 机场登机口拓扑图 ========")
+    gate_graph.display_graph()
+
+    # 5. 遍历航班，展示FIFO队列与自动同步的优先堆视图
+    print("\n======== 各航班登机队列演示 ========")
+    for flight in list(flight_dict.values())[:3]:  # 展示前3架航班避免输出过长
+        print(f"\n--- {flight} ---")
+        flight.boarding_queue.display()
+        flight.boarding_queue.display_priority_view()
+        # 校验FIFO与堆数据一致性
+        sync_ok = flight.boarding_queue.check_coherence()
+        print(f"FIFO与优先堆数据一致性校验: {'✅ 通过' if sync_ok else '❌ 不一致'}")
+
+        # 演示出队操作，验证单向同步更新
+        print("> 执行一次出队操作：")
+        removed_p = flight.boarding_queue.dequeue()
+        print(f"移出旅客: {removed_p}")
+        flight.boarding_queue.display()
+        flight.boarding_queue.display_priority_view()
+        sync_after = flight.boarding_queue.check_coherence()
+        print(f"出队后一致性校验: {'✅ 通过' if sync_after else '❌ 不一致'}")
+
+# 程序主入口
+if __name__ == "__main__":
+    demo_system()

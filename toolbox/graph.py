@@ -4,6 +4,7 @@ from toolbox.models import Gate
 class DirectedWeightedGraph:
     def __init__(self):
         self.adjacency: Dict[str, Dict[str, int]] = {}
+        # 改进1：gate_nodes 存储 Gate 完整对象，绑定图与Gate实体，而非仅ID映射
         self.gate_nodes: Dict[str, Gate] = {}
 
     def add_gate(self, gate: Gate) -> None:
@@ -88,8 +89,20 @@ class DirectedWeightedGraph:
     def display_graph(self) -> None:
         print("===== 廊桥有向加权图 =====")
         for gid, edges in self.adjacency.items():
+            # 改进2：打印时输出Gate完整对象信息，打通图与Gate实体展示，统一系统视图
+            gate_obj = self.gate_nodes[gid]
+            gate_brief = f"{gate_obj.gate_id}(航站楼:{gate_obj.terminal},容量:{gate_obj.capacity})"
             if edges:
                 s = ", ".join([f"{t}({v}min)" for t, v in edges.items()])
-                print(f"{gid} → {s}")
+                print(f"{gate_brief} → {s}")
             else:
-                print(f"{gid} → 无通道")
+                print(f"{gate_brief} → 无通道")
+
+    # 改进3：新增方法，通过gate_id获取完整Gate对象，实现图系统直接操作Gate实体（匹配任务2：图与数据联动）
+    def get_gate_by_id(self, gate_id: str) -> Optional[Gate]:
+        return self.gate_nodes.get(gate_id)
+
+    # 改进4：新增批量绑定登机口邻接关系的工具方法，快速构建机场完整拓扑图
+    def link_two_gates(self, gate_a_id: str, gate_b_id: str, walk_time: int) -> None:
+        self.add_path(gate_a_id, gate_b_id, walk_time)
+        self.add_path(gate_b_id, gate_a_id, walk_time)
