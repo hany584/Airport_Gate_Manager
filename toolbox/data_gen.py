@@ -135,7 +135,7 @@ def load_passengers() -> List[Passenger]:
                 passenger_id=row["passenger_id"],
                 name=row["name"],
                 boarding_group=int(row["boarding_group"]),
-                has_special_needs=eval(row["has_special_needs"]),
+                has_special_needs=(row["has_special_needs"].strip().upper() == "TRUE"),
                 connecting_flight_id=row["connecting_flight_id"] if row["connecting_flight_id"] else None
             )
             passenger_list.append(p)
