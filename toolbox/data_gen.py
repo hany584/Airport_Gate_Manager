@@ -252,3 +252,14 @@ def generate_project_documents():
     
     # 注意：这里用 """ 开始
     readme_content = """# Airport Gate Manager System"""
+
+#项目说明：
+#机场登机口、航班、旅客一体化管理系统，包含：
+#1. 同步FIFO队列（自动维护大顶堆优先队列，单向同步无循环调用）
+#2. 登机口加权有向图拓扑结构
+#3. CSV数据集自动生成工具
+#4. 全实体双向关联: Passenger ↔ Flight ↔ Gate ↔ Boarding Queue
+## 环境部署（干净机器运行步骤）
+### 1. 安装依赖
+#```bash
+#pip install -r requirements.txt

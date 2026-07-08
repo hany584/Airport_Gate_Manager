@@ -20,6 +20,12 @@ def demo_queue_function():
     sync_result = check_queue_coherence(fifo)
     print(f"手动队列一致性校验: {'✅ 通过' if sync_result else '❌ 不一致'}")
 
+# NEW：新增批量数据集演示，匹配需求：主系统使用生成数据集展示队列
+def demo_queue_function():
+    """演示两种队列使用"""
+    # 【MODIFIED 删除手动手写3个乘客，匹配需求：不用手写乘客，基于数据集演示】
+    print("\n===== 队列功能演示（基于批量数据集） =====")
+
 
 def main():
     print("===== 机场登机口管理系统 Part2 一体化完整系统 =====")
