@@ -1,10 +1,12 @@
 from typing import Optional
-from toolbox.models import Passenger
+
 
 # 单链表节点【无任何修改】
 class ListNode:
-    def __init__(self, value: Passenger):
-        self.value = value
+    def __init__(self, value):
+        # 局部导入切断顶部循环依赖
+        from toolbox.models import Passenger
+        self.value: Passenger = value
         self.next: Optional[ListNode] = None
 
 # FIFO标准链表队列【大量修改，改动行标// MODIFIED / NEW】
@@ -16,7 +18,8 @@ class LinkedListQueue:
         # NEW：内置优先堆，由FIFO单向维护
         self._priority_heap = PriorityQueue()
 
-    def enqueue(self, passenger: Passenger) -> None:
+    def enqueue(self, passenger):
+        from toolbox.models import Passenger
         new_node = ListNode(passenger)
         if self.tail is None:
             self.head = new_node
@@ -28,7 +31,8 @@ class LinkedListQueue:
         # NEW：入队同步更新优先堆
         self._priority_heap.enqueue(passenger)
 
-    def dequeue(self) -> Optional[Passenger]:
+    def dequeue(self):
+        from toolbox.models import Passenger
         if self.head is None:
             return None
         pop_node = self.head
@@ -51,7 +55,8 @@ class LinkedListQueue:
             self._priority_heap.enqueue(cur.value)
             cur = cur.next
 
-    def peek(self) -> Optional[Passenger]:
+    def peek(self):
+        from toolbox.models import Passenger
         return self.head.value if self.head else None
 
     def size(self) -> int:
@@ -77,7 +82,7 @@ class LinkedListQueue:
 # 最大堆优先队列【无业务逻辑修改，仅内部方法可见性不变，禁止外部直接调用enqueue/dequeue】
 class PriorityQueue:
     def __init__(self):
-        self._heap: list[tuple[int, Passenger]] = []
+        self._heap = []
 
     def _parent_idx(self, idx: int) -> int:
         return (idx - 1) // 2
@@ -109,12 +114,14 @@ class PriorityQueue:
             self._swap(idx, largest)
             self._heapify_down(largest)
 
-    def enqueue(self, passenger: Passenger) -> None:
+    def enqueue(self, passenger):
+        from toolbox.models import Passenger
         score = passenger.get_priority_score()
         self._heap.append((score, passenger))
         self._heapify_up(len(self._heap)-1)
 
-    def dequeue(self) -> Optional[Passenger]:
+    def dequeue(self):
+        from toolbox.models import Passenger
         if len(self._heap) == 0:
             return None
         self._swap(0, len(self._heap)-1)
@@ -122,13 +129,18 @@ class PriorityQueue:
         self._heapify_down(0)
         return top_person
 
-    def peek(self) -> Optional[Passenger]:
+    def peek(self):
+        from toolbox.models import Passenger
         return self._heap[0][1] if self._heap else None
 
     def size(self) -> int:
         return len(self._heap)
 
     def display(self) -> None:
+        cur_type = tuple
         sorted_list = sorted(self._heap, key=lambda x: x[0], reverse=True)
-        show_text = [f"{p[1]} (分数:{p[0]})" for p in sorted_list]
+        show_text = []
+        from toolbox.models import Passenger
+        for p in sorted_list:
+            show_text.append(f"{p[1]} (分数:{p[0]})")
         print(f"[优先队列] 排序：{' -> '.join(show_text) if show_text else '空队列'}")

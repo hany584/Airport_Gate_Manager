@@ -3,15 +3,11 @@ from toolbox.data_gen import generate_all_datasets, load_gates, load_flights, lo
 from toolbox.queue import LinkedListQueue
 from toolbox.models import Passenger
 
-
-
-
 # NEW：新增批量数据集演示，匹配需求：主系统使用生成数据集展示队列
 def demo_queue_function():
     """演示两种队列使用"""
     # 【MODIFIED 删除手动手写3个乘客，匹配需求：不用手写乘客，基于数据集演示】
     print("\n===== 队列功能演示（基于批量数据集） =====")
-
 
 def main():
     print("===== 机场登机口管理系统 Part2 一体化完整系统 =====")
@@ -37,27 +33,26 @@ def main():
     link_full_system(gates, flights, passengers)
 
     # 【MODIFIED 数据集真实业务队列演示，区分手动测试乘客，满足需求：主系统使用生成数据集展示队列】
-    print("\n======== 各航班登机队列演示（CSV数据集真实乘客，自动同步优先堆） ========")
-    # 遍历前3个航班展示，避免输出过长
-    for flight in list(flights.values())[:3]:
-        print(f"\n--- {flight} ---")
-        # 一键打印FIFO队列 + 自动同步的优先堆视图
-        flight.gate.boarding_queue.display_all()
-        # 校验FIFO与优先堆数据一致性，匹配测试需求FIFO and heap stay coherent
-        sync_result = check_queue_coherence(flight.gate.boarding_queue)
-        print(f"FIFO与优先堆数据一致性校验: {'✅ 通过' if sync_result else '❌ 不一致'}")
+    print("\n======== 单航班登机队列演示（CSV数据集真实乘客，自动同步优先堆） ========")
+    # 只取第一条航班，完全移除for循环遍历逻辑
+    single_flight = list(flights.values())[0]
+    print(f"\n--- {single_flight} ---")
+    # 一键打印FIFO队列 + 自动同步的优先堆视图
+    single_flight.gate.boarding_queue.display_all()
+    # 校验FIFO与优先堆数据一致性，匹配测试需求FIFO and heap stay coherent
+    sync_result = check_queue_coherence(single_flight.gate.boarding_queue)
+    print(f"FIFO与优先堆数据一致性校验: {'✅ 通过' if sync_result else '❌ 不一致'}")
 
-        # 演示出队操作，验证单向同步更新规则（仅修改FIFO自动同步堆，无反向调用）
-        print("> 执行一次出队操作：")
-        removed_pax = flight.gate.boarding_queue.dequeue()
-        print(f"移出旅客: {removed_pax}")
-        flight.gate.boarding_queue.display_all()
-        sync_after_dequeue = check_queue_coherence(flight.gate.boarding_queue)
-        print(f"出队后一致性校验: {'✅ 通过' if sync_after_dequeue else '❌ 不一致'}")
+    # 演示出队操作，验证单向同步更新规则（仅修改FIFO自动同步堆，无反向调用）
+    print("> 执行一次出队操作：")
+    removed_pax = single_flight.gate.boarding_queue.dequeue()
+    print(f"移出旅客: {removed_pax}")
+    single_flight.gate.boarding_queue.display_all()
+    sync_after_dequeue = check_queue_coherence(single_flight.gate.boarding_queue)
+    print(f"出队后一致性校验: {'✅ 通过' if sync_after_dequeue else '❌ 不一致'}")
 
     # 调用基础手动测试队列演示
     demo_queue_function()
-
 
 if __name__ == "__main__":
     main()
