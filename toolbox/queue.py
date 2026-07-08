@@ -1,18 +1,20 @@
 from typing import Optional
 from toolbox.models import Passenger
 
-# 单链表节点
+# 单链表节点【无任何修改】
 class ListNode:
     def __init__(self, value: Passenger):
         self.value = value
         self.next: Optional[ListNode] = None
 
-# FIFO标准链表队列
+# FIFO标准链表队列【大量修改，改动行标// MODIFIED / NEW】
 class LinkedListQueue:
     def __init__(self):
         self.head: Optional[ListNode] = None
         self.tail: Optional[ListNode] = None
         self._size = 0
+        # NEW：内置优先堆，由FIFO单向维护
+        self._priority_heap = PriorityQueue()
 
     def enqueue(self, passenger: Passenger) -> None:
         new_node = ListNode(passenger)
@@ -23,6 +25,8 @@ class LinkedListQueue:
             self.tail.next = new_node
             self.tail = new_node
         self._size += 1
+        # NEW：入队同步更新优先堆
+        self._priority_heap.enqueue(passenger)
 
     def dequeue(self) -> Optional[Passenger]:
         if self.head is None:
@@ -32,7 +36,20 @@ class LinkedListQueue:
         self._size -= 1
         if self.head is None:
             self.tail = None
-        return pop_node.value
+        popped_passenger = pop_node.value
+        # NEW：出队后全量同步重建堆（保证两边数据完全一致）
+        self._sync_priority_heap()
+        return popped_passenger
+
+    # NEW：私有同步方法，遍历链表，完全重置堆，实现双向数据一致
+    def _sync_priority_heap(self) -> None:
+        # 1. 清空原有堆
+        self._priority_heap._heap.clear()
+        # 2. 遍历当前FIFO链表所有乘客，重新写入堆
+        cur = self.head
+        while cur:
+            self._priority_heap.enqueue(cur.value)
+            cur = cur.next
 
     def peek(self) -> Optional[Passenger]:
         return self.head.value if self.head else None
@@ -48,7 +65,16 @@ class LinkedListQueue:
             cur = cur.next
         print(f"[FIFO队列] 元素：{' -> '.join(res) if res else '空队列'}")
 
-# 最大堆优先队列
+    # NEW：对外暴露优先堆查看接口，不暴露修改接口
+    def get_priority_queue(self) -> "PriorityQueue":
+        return self._priority_heap
+
+    # NEW：一键同时打印FIFO和优先队列，方便main演示
+    def display_all(self) -> None:
+        self.display()
+        self._priority_heap.display()
+
+# 最大堆优先队列【无业务逻辑修改，仅内部方法可见性不变，禁止外部直接调用enqueue/dequeue】
 class PriorityQueue:
     def __init__(self):
         self._heap: list[tuple[int, Passenger]] = []
