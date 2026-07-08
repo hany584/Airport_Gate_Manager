@@ -4,21 +4,7 @@ from toolbox.queue import LinkedListQueue
 from toolbox.models import Passenger
 
 
-def demo_queue_function():
-    """演示两种队列使用"""
-    print("\n===== 队列功能演示（手动测试乘客 + 批量数据集双演示） =====")
-    # 保留手写测试乘客，用于基础单元测试
-    p1 = Passenger("P0001", "Olivia Taylor", 1, True, "CA9999")
-    p2 = Passenger("P0002", "Noah Wilson", 4, False, None)
-    p3 = Passenger("P0003", "Ava Davis", 2, False, "CA8888")
-    fifo = LinkedListQueue()
-    fifo.enqueue(p1)
-    fifo.enqueue(p2)
-    fifo.enqueue(p3)
-    print("--- 手动测试乘客 - FIFO队列与自动同步优先堆 ---")
-    fifo.display_all()
-    sync_result = check_queue_coherence(fifo)
-    print(f"手动队列一致性校验: {'✅ 通过' if sync_result else '❌ 不一致'}")
+
 
 # NEW：新增批量数据集演示，匹配需求：主系统使用生成数据集展示队列
 def demo_queue_function():
