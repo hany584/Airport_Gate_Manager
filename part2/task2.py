@@ -1,50 +1,140 @@
 # part2/task2.py
 import sys
 import os
+
+# 项目路径配置
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(BASE_DIR)
 os.chdir(BASE_DIR)
 
-from toolbox.data_gen import load_gates, load_flights, load_passengers, init_gate_graph
+def calc_gate_utilization(gate, total_sim_time):
+    """复用工具：登机口利用率计算"""
+    if total_sim_time == 0:
+        return 0.0
+    busy = gate.busy_time if hasattr(gate, "busy_time") else 0
+    return round(busy / total_sim_time, 3)
 
-MIN_CONNECT_BUFFER = 15
+def simulate_boarding(gates, flights, passengers):
+    """复用Task1完整登机仿真逻辑"""
+    missed_conn = 0
+    sim_time = 0
+    max_time = 500
+    for g in gates.values():
+        g.busy_time = 0
+    flight_pass_map = {}
+    for f in flights.values():
+        flight_pass_map[f.flight_id] = []
+    for p in passengers:
+        flight_pass_map[p.flight.flight_id].append(p)
+
+    while sim_time < max_time:
+        any_boarding = False
+        for g in gates.values():
+            if g.boarding_queue.size() > 0:
+                g.boarding_queue.dequeue()
+                g.busy_time += 1
+                any_boarding = True
+        if not any_boarding:
+            break
+        sim_time += 1
+
+    for p in passengers:
+        if p.connecting_flight_id is None:
+            continue
+        conn_fid = p.connecting_flight_id
+        if conn_fid not in flights:
+            missed_conn += 1
+            continue
+        conn_flight = flights[conn_fid]
+        if sim_time >= int(conn_flight.scheduled_time.split(":")[0]) * 60:
+            missed_conn += 1
+    util_result = {}
+    for gid, g in gates.items():
+        util_result[gid] = calc_gate_utilization(g, sim_time)
+    return sim_time, missed_conn, util_result
+
+def judge_risk_passengers(graph, flights, passengers, total_sim_time):
+    """Task2核心：判定中转旅客误机高风险"""
+    high_risk_list = []
+    total_connect_pax = 0
+
+    for pax in passengers:
+        # 无中转航班直接跳过
+        if not pax.connecting_flight_id:
+            continue
+        total_connect_pax += 1
+        pre_flight = pax.flight
+        conn_fid = pax.connecting_flight_id
+        if conn_fid not in flights:
+            high_risk_list.append(pax)
+            continue
+        conn_flight = flights[conn_fid]
+        # 前序航班、中转航班必须绑定登机口
+        if not pre_flight.gate or not conn_flight.gate:
+            high_risk_list.append(pax)
+            continue
+        # 调用图模块获取两登机口最短步行时长
+        path, walk_min = graph.shortest_path_between_flights(pre_flight, conn_flight)
+        if walk_min is None:
+            high_risk_list.append(pax)
+            continue
+        # 计算中转剩余时间：计划起飞时间 - 当前仿真总时间
+        conn_hour = int(conn_flight.scheduled_time.split(":")[0])
+        conn_total_min = conn_hour * 60
+        remain_time = conn_total_min - total_sim_time
+        # 剩余时间 < 步行耗时 → 高风险
+        if remain_time < walk_min:
+            high_risk_list.append({
+                "passenger": pax,
+                "walk_time": walk_min,
+                "remain_time": remain_time,
+                "pre_gate": pre_flight.gate.gate_id,
+                "conn_gate": conn_flight.gate.gate_id,
+                "shortest_path": path
+            })
+    return high_risk_list, total_connect_pax
 
 if __name__ == "__main__":
-    # 加载数据
+    # 动态导入，规避顶层循环导入
+    data_gen_mod = __import__("toolbox.data_gen", fromlist=[
+        "load_gates", "load_flights", "load_passengers",
+        "init_gate_graph", "link_full_system"
+    ])
+    load_gates = data_gen_mod.load_gates
+    load_flights = data_gen_mod.load_flights
+    load_passengers = data_gen_mod.load_passengers
+    init_gate_graph = data_gen_mod.init_gate_graph
+    link_full_system = data_gen_mod.link_full_system
+
+    # 加载数据集、构建登机口拓扑图、绑定系统
     gates = load_gates()
     flights = load_flights()
     passengers = load_passengers()
-    graph = init_gate_graph()
+    gate_graph = init_gate_graph()
+    link_full_system(gates, flights, passengers)
 
-    # 过滤登机口不存在的航班，防止KeyError
-    valid_gates = set(gates.keys())
-    flights = {fid: f for fid, f in flights.items() if f.gate_id in valid_gates}
+    # 先执行Task1登机仿真
+    total_sim_time, total_miss, gate_util = simulate_boarding(gates, flights, passengers)
 
-    flight_gate_map = {f.flight_id: f.gate_id for f in flights.values()}
-    risk_passenger_list = []
+    # Task2：判定中转高风险旅客
+    risk_pax_info, total_conn = judge_risk_passengers(gate_graph, flights, passengers, total_sim_time)
 
-    # 遍历旅客，只判断connecting_flight_id
-    for pax in passengers:
-        conn_flight_id = pax.connecting_flight_id
-        # 没有接续航班直接跳过
-        if not conn_flight_id or conn_flight_id not in flight_gate_map:
-            continue
+    # 输出报告
+    print("========== Part2 Task2 中转旅客误机风险分析报告 ==========")
+    print(f"全局登机仿真总时长：{total_sim_time} 时间单位")
+    print(f"全部中转旅客总数量：{total_conn}")
+    print(f"高误机风险旅客数量：{len(risk_pax_info)}")
+    if total_conn > 0:
+        risk_rate = len(risk_pax_info) / total_conn * 100
+        print(f"中转旅客风险占比：{risk_rate:.2f}%")
 
-        depart_gate = flight_gate_map[conn_flight_id]
-        all_gate_list = list(flight_gate_map.values())
-        arrival_gate = all_gate_list[0]
-        _, walk_minute = graph.find_shortest_path(arrival_gate, depart_gate)
-
-        flight_info = flights[conn_flight_id]
-        available_time = 60 - flight_info.delay_minutes
-
-        if available_time < walk_minute + MIN_CONNECT_BUFFER:
-            risk_passenger_list.append((pax.name, walk_minute, available_time))
-
-    # 输出结果
-    print("===== Task2 高风险转机旅客 =====")
-    if len(risk_passenger_list) == 0:
-        print("暂无存在误机风险的转机旅客")
-    else:
-        for name, walk_time, free_time in risk_passenger_list[:5]:
-            print(f"旅客{name}，步行耗时{walk_time}分钟，剩余转机时间{free_time}分钟，存在误机风险")
+    print("\n===== 高风险旅客明细 =====")
+    for item in risk_pax_info:
+        if isinstance(item, dict):
+            p = item["passenger"]
+            print(f"旅客ID:{p.passenger_id} 姓名:{p.name}")
+            print(f"  前序登机口:{item['pre_gate']} → 中转登机口:{item['conn_gate']}")
+            print(f"  最短步行路径:{item['shortest_path']} 步行耗时:{item['walk_time']}分钟")
+            print(f"  剩余可用中转时间:{item['remain_time']}分钟（时间不足，高风险）\n")
+        else:
+            print(f"旅客{item.passenger_id}：中转航班不存在/无登机口绑定，极高误机风险\n")

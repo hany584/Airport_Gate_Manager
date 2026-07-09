@@ -1,71 +1,92 @@
 # part2/task1.py
 import sys
 import os
-# 拿到项目根目录路径
+
+# 路径配置，保证识别toolbox包
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-# 把根目录加入系统路径，解决toolbox导入
 sys.path.append(BASE_DIR)
-# 切换工作目录到项目根目录，csv就能正常读取
 os.chdir(BASE_DIR)
 
-from collections import defaultdict
-from toolbox.data_gen import load_gates, load_flights, load_passengers, init_gate_graph
+# 工具函数：计算登机口利用率 → 对应Task1指标3
+def calc_gate_utilization(gate, total_sim_time):
+    if total_sim_time == 0:
+        return 0.0
+    busy = gate.busy_time if hasattr(gate, "busy_time") else 0
+    return round(busy / total_sim_time, 3)
 
-class BoardingSimulator:
-    def __init__(self, gates, flights, passengers):
-        self.gates = gates
-        self.flights = flights
-        self.passengers = passengers
-        self.stats = {
-            "sim_total_min": 0,
-            "gate_busy_min": defaultdict(int)
-        }
+# 核心仿真逻辑，完全匹配Task1全部仿真要求
+def simulate_boarding(gates, flights, passengers):
+    missed_conn = 0  # Task1指标2：错过中转旅客总数
+    sim_time = 0      # Task1指标1：总登机仿真时长
+    max_time = 500    # 仿真上限，防止死循环
 
-    def allocate_passengers(self):
-        flight_pax = defaultdict(list)
-        for p in self.passengers:
-            fid = p.connecting_flight_id
-            if fid:
-                flight_pax[fid].append(p)
-        for fid, pax_list in flight_pax.items():
-            if fid not in self.flights:
-                continue
-            gate_id = self.flights[fid].gate_id
-            for p in pax_list:
-                self.gates[gate_id].priority_queue.enqueue(p)
+    # 给每个登机口初始化忙碌计时，用于利用率计算
+    for g in gates.values():
+        g.busy_time = 0
 
-    def time_step(self):
-        for gid, gate in self.gates.items():
-            if gate.priority_queue.size() > 0:
-                gate.priority_queue.dequeue()
-                self.stats["gate_busy_min"][gid] += 1
+    # 构建航班-旅客映射，方便中转校验
+    flight_pass_map = {}
+    for f in flights.values():
+        flight_pass_map[f.flight_id] = []
+    for p in passengers:
+        flight_pass_map[p.flight.flight_id].append(p)
 
-    def run(self, max_time=300):
-        self.allocate_passengers()
-        clock = 0
-        while clock < max_time:
-            has_person = any(g.priority_queue.size()>0 for g in self.gates.values())
-            if not has_person:
-                break
-            self.time_step()
-            clock += 1
-        self.stats["sim_total_min"] = clock
-        return self.stats
+    # 核心规则：每个时间单位，每个登机口放行1人
+    while sim_time < max_time:
+        any_boarding = False
+        for g in gates.values():
+            if g.boarding_queue.size() > 0:
+                g.boarding_queue.dequeue()
+                g.busy_time += 1
+                any_boarding = True
+        # 全部登机口无旅客，仿真提前结束
+        if not any_boarding:
+            break
+        sim_time += 1
+
+    # 统计错过中转航班的旅客（指标2）
+    for p in passengers:
+        if p.connecting_flight_id is None:
+            continue
+        conn_fid = p.connecting_flight_id
+        if conn_fid not in flights:
+            missed_conn += 1
+            continue
+        conn_flight = flights[conn_fid]
+        # 仿真总时长超过中转航班计划起飞时间 → 误机
+        if sim_time >= int(conn_flight.scheduled_time.split(":")[0]) * 60:
+            missed_conn += 1
+
+    # 批量计算所有登机口利用率（指标3）
+    util_result = {}
+    for gid, g in gates.items():
+        util_result[gid] = calc_gate_utilization(g, sim_time)
+
+    return sim_time, missed_conn, util_result
 
 if __name__ == "__main__":
+    # 方案2：动态导入，不写在文件顶部，延后加载模块
+    data_gen_mod = __import__("toolbox.data_gen", fromlist=[
+        "load_gates", "load_flights", "load_passengers", "link_full_system"
+    ])
+    load_gates = data_gen_mod.load_gates
+    load_flights = data_gen_mod.load_flights
+    load_passengers = data_gen_mod.load_passengers
+    link_full_system = data_gen_mod.link_full_system
+
+    # 加载数据集并完成系统绑定
     gates = load_gates()
     flights = load_flights()
     passengers = load_passengers()
+    link_full_system(gates, flights, passengers)
 
-    # 过滤登机口不存在的航班，解决KeyError:G12
-    valid_gates = set(gates.keys())
-    flights = {fid: f for fid, f in flights.items() if f.gate_id in valid_gates}
+    # 运行登机仿真
+    total_time, miss_count, gate_util = simulate_boarding(gates, flights, passengers)
 
-    sim = BoardingSimulator(gates, flights, passengers)
-    res = sim.run()
-
-    print("===== Task1 登机仿真结果 =====")
-    print(f"总耗时：{res['sim_total_min']} 分钟")
-    for gid, busy in res["gate_busy_min"].items():
-        ratio = round(busy / res["sim_total_min"], 3)
-        print(f"{gid} 利用率：{ratio}")
+    # 输出Task1要求的汇总报告
+    print("========== Part2 Task1 登机仿真汇总报告 ==========")
+    print(f"1. 全部航班完成登机总时长：{total_time} 时间单位")
+    print(f"2. 错过中转衔接航班旅客总数：{miss_count}")
+    print("\n3. 各登机口利用率：")
+    for gate_id, rate in gate_util.items():
+        print(f"{gate_id}：{rate * 100:.1f}%")
