@@ -245,7 +245,7 @@ def generate_project_documents():
 """
     with open(req_path, "w", encoding="utf-8") as f:
         f.write(req_content)
-    print(f"✅ requirements.txt 已生成：{req_path}")
+    print(f"【完成】requirements.txt 已生成：{req_path}")
 
     # 2. 生成基础 README.md
     readme_path = os.path.join(ROOT_PATH, "README.md")
