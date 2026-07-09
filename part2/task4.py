@@ -1,192 +1,143 @@
 # part2/task4.py
-import sys
-import os
+import random
+import time
 import matplotlib.pyplot as plt
+from collections import deque
 
-# 解决中文乱码（Windows可选）
-plt.rcParams["font.sans-serif"] = ["SimHei"]
-plt.rcParams["axes.unicode_minus"] = False
+# ==============================================
+# 步骤1：生成机场拓扑图（V个顶点，平均每个节点3条边）
+# ==============================================
+def build_airport_graph(num_gates):
+    """
+    功能：生成登机口连通无向图
+    输入：num_gates 登机口总数量N
+    约束：每个登机口平均3条双向通道
+    """
+    graph = {i: [] for i in range(num_gates)}  # 邻接表存储机场图
+    edge_set = set()  # 防止生成重复双向边
+    total_target_edges = int((num_gates * 3) / 2)  # 无向图总边数公式
 
-# 路径配置
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(BASE_DIR)
-os.chdir(BASE_DIR)
+    # 不断随机加边，直到边数达标
+    while len(edge_set) < total_target_edges:
+        u = random.randint(0, num_gates - 1)  # 随机起点登机口
+        v = random.randint(0, num_gates - 1)  # 随机终点登机口
+        if u != v and (u, v) not in edge_set and (v, u) not in edge_set:
+            edge_set.add((u, v))
+            graph[u].append(v)
+            graph[v].append(u)
+    return graph
 
-def calc_gate_utilization(gate, total_sim_time):
-    if total_sim_time == 0:
-        return 0.0
-    busy = gate.busy_time if hasattr(gate, "busy_time") else 0
-    return round(busy / total_sim_time, 3)
+# ==============================================
+# 步骤2-1：任务1 最短路径 + 计时函数
+# ==============================================
+def bfs_shortest_path(graph, start_gate, end_gate):
+    """BFS计算两个登机口之间最短步行路径"""
+    if start_gate == end_gate:
+        return 0
+    visited = {start_gate}
+    queue = deque([(start_gate, 0)])
+    while queue:
+        current_node, dist = queue.popleft()
+        for neighbor in graph[current_node]:
+            if neighbor == end_gate:
+                return dist + 1
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append((neighbor, dist + 1))
+    return None
 
-def simulate_boarding(gates, flights, passengers):
-    missed_conn = 0
-    sim_time = 0
-    max_time = 500
-    for g in gates.values():
-        g.busy_time = 0
-    flight_pass_map = {}
-    for f in flights.values():
-        flight_pass_map[f.flight_id] = []
-    for p in passengers:
-        flight_pass_map[p.flight.flight_id].append(p)
+def measure_shortest_path_time(graph, test_times=20):
+    """多次随机选取登机口对，批量运行寻路，统计总耗时"""
+    node_list = list(graph.keys())
+    start_time = time.perf_counter()  # 高精度计时开始
+    for _ in range(test_times):
+        gate_a, gate_b = random.sample(node_list, 2)
+        bfs_shortest_path(graph, gate_a, gate_b)
+    total_time = time.perf_counter() - start_time  # 计算总运行时长
+    return total_time
 
-    while sim_time < max_time:
-        any_boarding = False
-        for g in gates.values():
-            if g.boarding_queue.size() > 0:
-                g.boarding_queue.dequeue()
-                g.busy_time += 1
-                any_boarding = True
-        if not any_boarding:
-            break
-        sim_time += 1
+# ==============================================
+# 步骤2-2：任务2 延误级联传播 + 计时函数
+# ==============================================
+def delay_cascade_propagate(graph, source_gate=0):
+    """从初始延误节点出发，BFS逐层扩散连锁延误"""
+    delayed_set = set()
+    queue = deque([source_gate])
+    delayed_set.add(source_gate)
+    while queue:
+        curr = queue.popleft()
+        for neighbour in graph[curr]:
+            if neighbour not in delayed_set:
+                delayed_set.add(neighbour)
+                queue.append(neighbour)
+    return delayed_set
 
-    for p in passengers:
-        if p.connecting_flight_id is None:
-            continue
-        conn_fid = p.connecting_flight_id
-        if conn_fid not in flights:
-            missed_conn += 1
-            continue
-        conn_flight = flights[conn_fid]
-        if sim_time >= int(conn_flight.scheduled_time.split(":")[0]) * 60:
-            missed_conn += 1
-    util_result = {}
-    for gid, g in gates.items():
-        util_result[gid] = calc_gate_utilization(g, sim_time)
-    return sim_time, missed_conn, util_result
+def measure_cascade_time(graph):
+    """测量单次完整延误级联仿真的运行时间"""
+    start_time = time.perf_counter()
+    delay_cascade_propagate(graph, source_gate=0)
+    run_time = time.perf_counter() - start_time
+    return run_time
 
-def judge_risk_passengers(graph, flights, passengers, total_sim_time):
-    high_risk_list = []
-    total_connect_pax = 0
-    for pax in passengers:
-        if not pax.connecting_flight_id:
-            continue
-        total_connect_pax += 1
-        pre_flight = pax.flight
-        conn_fid = pax.connecting_flight_id
-        if conn_fid not in flights:
-            high_risk_list.append(pax)
-            continue
-        conn_flight = flights[conn_fid]
-        if not pre_flight.gate or not conn_flight.gate:
-            high_risk_list.append(pax)
-            continue
-        path, walk_min = graph.shortest_path_between_flights(pre_flight, conn_flight)
-        if walk_min is None:
-            high_risk_list.append(pax)
-            continue
-        conn_hour = int(conn_flight.scheduled_time.split(":")[0])
-        conn_total_min = conn_hour * 60
-        remain_time = conn_total_min - total_sim_time
-        if remain_time < walk_min:
-            high_risk_list.append({
-                "passenger": pax,
-                "walk_time": walk_min,
-                "remain_time": remain_time,
-                "pre_gate": pre_flight.gate.gate_id,
-                "conn_gate": conn_flight.gate.gate_id,
-                "shortest_path": path
-            })
-    return high_risk_list, total_connect_pax
+# ==============================================
+# 步骤2-3：任务3 登机仿真 + 计时函数
+# ==============================================
+def boarding_simulation(flight_num, passenger_per_flight):
+    """模拟N架航班、每架M名乘客的完整登机排队逻辑"""
+    total_passengers = flight_num * passenger_per_flight
+    passenger_queue = list(range(total_passengers))
+    passenger_queue.sort()  # 用队列运算模拟登机流程开销
 
-def calculate_delay_spread(flights, gates):
-    gate_delay_record = {}
-    affected_flights = []
-    total_spread_delay = 0
-    for gid in gates.keys():
-        gate_delay_record[gid] = 0
-    for flight in flights.values():
-        gate_id = flight._gate_id
-        base_delay = flight.delay_minutes
-        gate_total_delay = gate_delay_record[gate_id]
-        real_delay = base_delay + gate_total_delay
-        if real_delay > base_delay:
-            affected_flights.append({
-                "flight_id": flight.flight_id,
-                "gate_id": gate_id,
-                "original_delay": base_delay,
-                "spread_delay": gate_total_delay,
-                "total_real_delay": real_delay
-            })
-            total_spread_delay += gate_total_delay
-        gate_delay_record[gate_id] = real_delay
-    avg_spread = total_spread_delay / len(affected_flights) if affected_flights else 0
-    return affected_flights, avg_spread, gate_delay_record
+def measure_boarding_time(gate_count):
+    """按当前机场规模生成航班数据，运行登机仿真并计时"""
+    flight_count = gate_count       # 航班数量 = 登机口数量N
+    m_passengers = 15               # 每架航班乘客数量M
+    start_time = time.perf_counter()
+    boarding_simulation(flight_count, m_passengers)
+    return time.perf_counter() - start_time
 
-def draw_analysis_charts(gate_util_data, gate_delay_data, risk_count, total_conn):
-    """Task4 绘图：三张性能分析图"""
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 6))
-    gate_ids = list(gate_util_data.keys())
-    util_rates = [round(v * 100, 1) for v in gate_util_data.values()]
-    delay_mins = [gate_delay_data[g] for g in gate_ids]
+# ==============================================
+# 步骤3：循环遍历5组规模，批量采集耗时数据
+# ==============================================
+def run_full_benchmark():
+    # 题目指定的5档机场规模
+    scale_list = [10, 50, 200, 500, 1000]
+    time_path = []        # 存放每一档N对应的最短路径耗时
+    time_cascade = []      # 存放每一档N对应的延误传播耗时
+    time_boarding = []     # 存放每一档N对应的登机仿真耗时
 
-    # 图1：各登机口利用率柱状图
-    ax1.bar(gate_ids, util_rates, color="#4682B4")
-    ax1.set_title("各登机口利用率(%)")
-    ax1.set_xlabel("登机口ID")
-    ax1.set_ylabel("利用率 %")
-    ax1.tick_params(axis="x", rotation=45)
-    for idx, val in enumerate(util_rates):
-        ax1.text(idx, val + 1, f"{val}%", ha="center")
+    # 循环逐个规模执行压力测试
+    for N in scale_list:
+        print(f"正在执行 N = {N} 的基准测试")
+        airport_graph = build_airport_graph(N)  # 生成当前规模机场模型
 
-    # 图2：各登机口累积延误时长
-    ax2.bar(gate_ids, delay_mins, color="#CD5C5C")
-    ax2.set_title("各登机口累积总延误(分钟)")
-    ax2.set_xlabel("登机口ID")
-    ax2.set_ylabel("延误时长 min")
-    ax2.tick_params(axis="x", rotation=45)
-    for idx, val in enumerate(delay_mins):
-        ax2.text(idx, val + 2, str(val), ha="center")
+        t1 = measure_shortest_path_time(airport_graph)
+        t2 = measure_cascade_time(airport_graph)
+        t3 = measure_boarding_time(N)
 
-    # 图3：中转旅客风险占比饼图
-    if total_conn > 0:
-        safe = total_conn - risk_count
-        pie_data = [risk_count, safe]
-        labels = [f"高风险旅客({risk_count}人)", f"安全旅客({safe}人)"]
-        ax3.pie(pie_data, labels=labels, autopct="%1.1f%%", colors=["#FF7F50", "#90EE90"])
-        ax3.set_title("中转旅客误机风险占比")
-    else:
-        ax3.text(0.5, 0.5, "无中转旅客数据", ha="center", va="center", fontsize=14)
-        ax3.set_title("中转旅客误机风险占比")
+        time_path.append(t1)
+        time_cascade.append(t2)
+        time_boarding.append(t3)
 
-    plt.tight_layout()
+    # ==============================================
+    # 步骤4：matplotlib绘制三条性能曲线
+    # ==============================================
+    plt.figure(figsize=(10, 6))
+    plt.plot(scale_list, time_path, marker="o", label="Shortest Path Calculation")
+    plt.plot(scale_list, time_cascade, marker="s", label="Delay Cascade Propagation")
+    plt.plot(scale_list, time_boarding, marker="^", label="Boarding Simulation")
+
+    plt.xlabel("Number of Gates N")
+    plt.ylabel("Program Runtime (seconds)")
+    plt.title("Task 4 Empirical Benchmarking")
+    plt.legend()
+    plt.grid(True)
     plt.show()
 
+    # 打印表格数据，用于作业分析
+    print("\n===== 运行耗时数据表 =====")
+    for idx, n in enumerate(scale_list):
+        print(f"N={n:4d} | Path:{time_path[idx]:.5f}s | Cascade:{time_cascade[idx]:.5f}s | Boarding:{time_boarding[idx]:.5f}s")
+
 if __name__ == "__main__":
-    # 动态导入，规避顶层循环导入
-    data_gen_mod = __import__("toolbox.data_gen", fromlist=[
-        "load_gates", "load_flights", "load_passengers",
-        "init_gate_graph", "link_full_system"
-    ])
-    load_gates = data_gen_mod.load_gates
-    load_flights = data_gen_mod.load_flights
-    load_passengers = data_gen_mod.load_passengers
-    init_gate_graph = data_gen_mod.init_gate_graph
-    link_full_system = data_gen_mod.link_full_system
-
-    # 加载数据集、构建图、绑定实体
-    gates = load_gates()
-    flights = load_flights()
-    passengers = load_passengers()
-    gate_graph = init_gate_graph()
-    link_full_system(gates, flights, passengers)
-
-    # 1. 执行Task1登机仿真
-    total_sim_time, total_miss, gate_util = simulate_boarding(gates, flights, passengers)
-    # 2. Task2 风险计算
-    risk_list, total_conn_pax = judge_risk_passengers(gate_graph, flights, passengers, total_sim_time)
-    risk_total = len(risk_list)
-    # 3. Task3 延误扩散计算
-    affected_flight_list, avg_spread_delay, gate_delay_info = calculate_delay_spread(flights, gates)
-
-    # 打印汇总性能指标
-    print("========== Part2 Task4 系统性能综合分析报告 ==========")
-    print(f"仿真总耗时：{total_sim_time} 时间单位")
-    print(f"错过中转总人数：{total_miss}")
-    print(f"中转旅客总数：{total_conn_pax}，高风险旅客：{risk_total}")
-    print(f"受连锁延误航班数量：{len(affected_flight_list)}，平均扩散延误：{avg_spread_delay:.2f} min")
-    print("\n正在生成三张性能分析图表……")
-
-    # 4. Task4 绘制可视化图表
-    draw_analysis_charts(gate_util, gate_delay_info, risk_total, total_conn_pax)
+    run_full_benchmark()
