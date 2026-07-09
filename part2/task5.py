@@ -3,27 +3,19 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import sys
 import os
+import random
 
 # 适配项目路径
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(BASE_DIR)
 os.chdir(BASE_DIR)
 
-# ========== 本地内置生成机场图函数（不再依赖task4导入） ==========
-def generate_airport_graph(n_gates, avg_edges=3):
-    import random
-    graph = {i: [] for i in range(n_gates)}
-    for u in range(n_gates):
-        edge_num = random.randint(1, avg_edges * 2)
-        for _ in range(edge_num):
-            v = random.randint(0, n_gates - 1)
-            if v != u and v not in graph[u]:
-                graph[u].append(v)
-                graph[v].append(u)
-    return graph
+# 复用task4的图生成、延误扩散函数
+from part2.task4 import build_airport_graph, delay_cascade_propagate
+
 
 # ========== 生成graph变量，解决 graph未定义 问题 ==========
-graph = generate_airport_graph(n_gates=10, avg_edges=3)
+graph = build_airport_graph(num_gates=10)
 G = nx.from_dict_of_lists(graph)
 
 # 固定布局，防止动画节点乱跳

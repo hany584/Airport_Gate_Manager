@@ -1,9 +1,21 @@
-# part2/task4.py
+import sys
+import os
 import random
 import time
 import matplotlib.pyplot as plt
 from collections import deque
 
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(BASE_DIR)
+
+from part2.task1 import simulate_boarding
+from toolbox.data_gen import load_gates, load_flights, load_passengers, link_full_system
+def load_and_link_all():
+    g = load_gates()
+    f = load_flights()
+    p = load_passengers()
+    link_full_system(g, f, p)
+    return g, f, p, None
 # ==============================================
 # 步骤1：生成机场拓扑图（V个顶点，平均每个节点3条边）
 # ==============================================
@@ -81,21 +93,17 @@ def measure_cascade_time(graph):
 
 # ==============================================
 # 步骤2-3：任务3 登机仿真 + 计时函数
-# ==============================================
-def boarding_simulation(flight_num, passenger_per_flight):
-    """模拟N架航班、每架M名乘客的完整登机排队逻辑"""
-    total_passengers = flight_num * passenger_per_flight
-    passenger_queue = list(range(total_passengers))
-    passenger_queue.sort()  # 用队列运算模拟登机流程开销
 
 def measure_boarding_time(gate_count):
     """按当前机场规模生成航班数据，运行登机仿真并计时"""
-    flight_count = gate_count       # 航班数量 = 登机口数量N
-    m_passengers = 15               # 每架航班乘客数量M
+    flight_count = gate_count
+    m_passengers = 15
     start_time = time.perf_counter()
-    boarding_simulation(flight_count, m_passengers)
-    return time.perf_counter() - start_time
 
+    gates, flights, passengers, _ = load_and_link_all()
+    simulate_boarding(gates, flights, passengers)
+
+    return time.perf_counter() - start_time
 # ==============================================
 # 步骤3：循环遍历5组规模，批量采集耗时数据
 # ==============================================
